@@ -36,11 +36,13 @@ jobs:
           )'''
           content = content.replace(old, new)
           old2 = 'put("max_dave_protocol_version", 0) // was 1, we don\'t support this so make it 0'
-          new2 = 'put("max_dave_protocol_version", 1) // DAVE enabled'
+          new2 = 'put("max_dave_protocol_version", 1) // DAVE enabled: libdave.so handles MLS'
           content = content.replace(old2, new2)
           with open(path, "w") as f:
               f.write(content)
-          print("Voice fixes applied")
+          assert "aead_aes256_gcm_rtpsize" in content, "AEAD patch failed!"
+          assert 'max_dave_protocol_version", 1' in content, "DAVE patch failed!"
+          print("Both voice fixes applied successfully.")
           PYEOF
 
       - name: Checkout BluecordPatcher
@@ -49,12 +51,20 @@ jobs:
           repository: bluemods/BluecordPatcher
           path: bluecord-patcher
 
-      - name: Patch BluecordPatcher to skip ADB install
+      - name: Patch BluecordPatcher for CI
         run: |
           MAIN="bluecord-patcher/src/main/kotlin/com/bluesmods/bluecordpatcher/Main.kt"
           sed -i 's/holder\.installApk(config\.getCompiledAlignedApkFile())\.exitOnFailure("Install")/\/\/ CI: skip ADB install/' "$MAIN"
-          sed -i '/holder\.extractBasicPackageInfo/,/^        }/d' "$MAIN"
           sed -i 's/holder\.launchApk/\/\/ holder.launchApk/' "$MAIN"
+          python3 - << 'PYEOF'
+          import re
+          with open("bluecord-patcher/src/main/kotlin/com/bluesmods/bluecordpatcher/Main.kt") as f:
+              txt = f.read()
+          txt = re.sub(r'\s*// Automatically start the app.*?LOG\.error\("could not extract package info.*?\}\n', '\n', txt, flags=re.DOTALL)
+          with open("bluecord-patcher/src/main/kotlin/com/bluesmods/bluecordpatcher/Main.kt", "w") as f:
+              f.write(txt)
+          print("CI patch applied.")
+          PYEOF
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -71,12 +81,12 @@ jobs:
           echo "$ANDROID_HOME/build-tools/35.0.0" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
-      - name: Build BluecordPatcher
-        run: |
-          cd bluecord-patcher
-          gradle wrapper --gradle-version 8.2 --no-daemon
-          chmod +x gradlew
-          ./gradlew jar --no-daemon
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build BluecordPatcher JAR
+        working-directory: bluecord-patcher
+        run: ./gradlew jar --no-daemon
 
       - name: Generate signing keystore
         run: |
@@ -109,7 +119,7 @@ jobs:
       - name: Build Bluecord APK
         run: java -jar bluecord-patcher/build/libs/BluecordPatcher.jar config.ini
 
-      - name: Upload APK
+      - name: Upload Bluecord APK
         uses: actions/upload-artifact@v4
         with:
           name: Bluecord-voice-fixed
