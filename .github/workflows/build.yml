@@ -69,9 +69,10 @@ jobs:
             -storepass bluecord123 -keypass bluecord123
           echo "bluecord123" > keystore_password.txt
 
-      - name: Create config.ini
+      - name: Create config.ini and local.properties
         run: |
           mkdir -p build_output/decompiled_discord
+          echo "sdk.dir=$ANDROID_HOME" > bluecord/local.properties
           cat > config.ini << EOF
           [config]
           BaseDir=${{ github.workspace }}/build_output
@@ -86,6 +87,9 @@ jobs:
           KeyStoreFile=${{ github.workspace }}/keystore.jks
           KeyStorePassword=${{ github.workspace }}/keystore_password.txt
           EOF
+
+      - name: Fix permissions
+        run: chmod +x bluecord/gradlew
 
       - name: Build Bluecord APK
         run: yes | java -jar bluecord-patcher/build/libs/BluecordPatcher.jar config.ini
