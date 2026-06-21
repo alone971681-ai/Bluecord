@@ -14,37 +14,6 @@ jobs:
           repository: bluemods/Bluecord
           path: bluecord
 
-      - name: Apply voice call fixes
-        run: |
-          python3 << 'PYEOF'
-          path = "bluecord/app/src/main/java/mods/rn/RNWebRtcFix.kt"
-          with open(path) as f:
-              content = f.read()
-          old = '''    private val supportedProtocols = listOf(
-              "xsalsa20_poly1305_lite_rtpsize",
-              "xsalsa20_poly1305_lite",
-              "xsalsa20_poly1305_suffix",
-              "xsalsa20_poly1305"
-          )'''
-          new = '''    private val supportedProtocols = listOf(
-              "aead_aes256_gcm_rtpsize",
-              "aead_xchacha20_poly1305_rtpsize",
-              "xsalsa20_poly1305_lite_rtpsize",
-              "xsalsa20_poly1305_lite",
-              "xsalsa20_poly1305_suffix",
-              "xsalsa20_poly1305"
-          )'''
-          content = content.replace(old, new)
-          old2 = 'put("max_dave_protocol_version", 0) // was 1, we don\'t support this so make it 0'
-          new2 = 'put("max_dave_protocol_version", 1) // DAVE enabled: libdave.so handles MLS'
-          content = content.replace(old2, new2)
-          with open(path, "w") as f:
-              f.write(content)
-          assert "aead_aes256_gcm_rtpsize" in content, "AEAD patch failed!"
-          assert 'max_dave_protocol_version", 1' in content, "DAVE patch failed!"
-          print("Both voice fixes applied successfully.")
-          PYEOF
-
       - name: Checkout BluecordPatcher
         uses: actions/checkout@v4
         with:
@@ -53,16 +22,16 @@ jobs:
 
       - name: Patch BluecordPatcher for CI
         run: |
-          MAIN="bluecord-patcher/src/main/kotlin/com/bluesmods/bluecordpatcher/Main.kt"
-          sed -i 's/holder\.installApk(config\.getCompiledAlignedApkFile())\.exitOnFailure("Install")/\/\/ CI: skip ADB install/' "$MAIN"
-          sed -i 's/holder\.launchApk/\/\/ holder.launchApk/' "$MAIN"
+          sed -i 's/holder\.installApk(config\.getCompiledAlignedApkFile())\.exitOnFailure("Install")/\/\/ CI: skip ADB install/' \
+            bluecord-patcher/src/main/kotlin/com/bluesmods/bluecordpatcher/Main.kt
+          sed -i 's/holder\.launchApk/\/\/ holder.launchApk/' \
+            bluecord-patcher/src/main/kotlin/com/bluesmods/bluecordpatcher/Main.kt
           python3 - << 'PYEOF'
           import re
-          with open("bluecord-patcher/src/main/kotlin/com/bluesmods/bluecordpatcher/Main.kt") as f:
-              txt = f.read()
+          f = "bluecord-patcher/src/main/kotlin/com/bluesmods/bluecordpatcher/Main.kt"
+          txt = open(f).read()
           txt = re.sub(r'\s*// Automatically start the app.*?LOG\.error\("could not extract package info.*?\}\n', '\n', txt, flags=re.DOTALL)
-          with open("bluecord-patcher/src/main/kotlin/com/bluesmods/bluecordpatcher/Main.kt", "w") as f:
-              f.write(txt)
+          open(f, "w").write(txt)
           print("CI patch applied.")
           PYEOF
 
