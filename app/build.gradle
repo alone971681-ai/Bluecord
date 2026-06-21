@@ -85,10 +85,15 @@ protobuf {
     protoc {
         artifact = 'com.google.protobuf:protoc:3.24.0'
     }
+    plugins {
+        javalite {
+            artifact = 'com.google.protobuf:protoc-gen-javalite:3.24.0'
+        }
+    }
     generateProtoTasks {
         all().forEach { task ->
-            task.builtins {
-                java {}
+            task.plugins {
+                javalite {}
             }
         }
     }
@@ -102,5 +107,5 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.5.1"
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.webkit:webkit:1.7.0'
-    implementation 'com.google.protobuf:protobuf-javalite:4.32.0'
+    implementation 'com.google.protobuf:protobuf-javalite:3.24.0'
 }
