@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package mods.activity.update;
+
+option java_package = "mods.activity.update";
+option java_outer_classname = "ExtensionsProto";
+
+import "update.proto";
+
+message ExtensionData {
+    mods.net.proto.UpdateInfo update_info = 1;
+    mods.net.proto.PollResponse poll_response = 2;
+}
