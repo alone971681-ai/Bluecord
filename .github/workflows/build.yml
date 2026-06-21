@@ -52,12 +52,12 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.2'
 
       - name: Build BluecordPatcher JAR
         working-directory: bluecord-patcher
-        run: |
-          chmod +x gradlew
-          ./gradlew jar --no-daemon
+        run: gradle jar --no-daemon
 
       - name: Generate signing keystore
         run: |
