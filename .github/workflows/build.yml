@@ -53,9 +53,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build BluecordPatcher JAR
+            - name: Build BluecordPatcher JAR
         working-directory: bluecord-patcher
-        run: ./gradlew jar --no-daemon
+        run: |
+          chmod +x gradlew
+          ./gradlew jar --no-daemon
 
       - name: Generate signing keystore
         run: |
