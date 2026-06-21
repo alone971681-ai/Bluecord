@@ -88,7 +88,7 @@ jobs:
           EOF
 
       - name: Build Bluecord APK
-        run: java -jar bluecord-patcher/build/libs/BluecordPatcher.jar config.ini
+        run: echo "y" | java -jar bluecord-patcher/build/libs/BluecordPatcher.jar config.ini
 
       - name: Upload Bluecord APK
         uses: actions/upload-artifact@v4
