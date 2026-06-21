@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package mods.net.proto;
+
+option java_package = "mods.net.proto";
+option java_outer_classname = "UpdateProto";
+
+message UpdateInfo {
+    string version = 1;
+    string url = 2;
+    bool required = 3;
+    string changelog = 4;
+}
+
+message PollRequest {
+    string current_version = 1;
+    string device_id = 2;
+}
+
+message PollResponse {
+    UpdateInfo update_info = 1;
+    bool has_update = 2;
+}
