@@ -1,0 +1,117 @@
+name: Build Bluecord APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Bluecord
+        uses: actions/checkout@v4
+        with:
+          repository: bluemods/Bluecord
+          path: bluecord
+
+      - name: Apply voice call fixes
+        run: |
+          python3 << 'PYEOF'
+          path = "bluecord/app/src/main/java/mods/rn/RNWebRtcFix.kt"
+          with open(path) as f:
+              content = f.read()
+          old = '''    private val supportedProtocols = listOf(
+              "xsalsa20_poly1305_lite_rtpsize",
+              "xsalsa20_poly1305_lite",
+              "xsalsa20_poly1305_suffix",
+              "xsalsa20_poly1305"
+          )'''
+          new = '''    private val supportedProtocols = listOf(
+              "aead_aes256_gcm_rtpsize",
+              "aead_xchacha20_poly1305_rtpsize",
+              "xsalsa20_poly1305_lite_rtpsize",
+              "xsalsa20_poly1305_lite",
+              "xsalsa20_poly1305_suffix",
+              "xsalsa20_poly1305"
+          )'''
+          content = content.replace(old, new)
+          old2 = 'put("max_dave_protocol_version", 0) // was 1, we don\'t support this so make it 0'
+          new2 = 'put("max_dave_protocol_version", 1) // DAVE enabled'
+          content = content.replace(old2, new2)
+          with open(path, "w") as f:
+              f.write(content)
+          print("Voice fixes applied")
+          PYEOF
+
+      - name: Checkout BluecordPatcher
+        uses: actions/checkout@v4
+        with:
+          repository: bluemods/BluecordPatcher
+          path: bluecord-patcher
+
+      - name: Patch BluecordPatcher to skip ADB install
+        run: |
+          MAIN="bluecord-patcher/src/main/kotlin/com/bluesmods/bluecordpatcher/Main.kt"
+          sed -i 's/holder\.installApk(config\.getCompiledAlignedApkFile())\.exitOnFailure("Install")/\/\/ CI: skip ADB install/' "$MAIN"
+          sed -i '/holder\.extractBasicPackageInfo/,/^        }/d' "$MAIN"
+          sed -i 's/holder\.launchApk/\/\/ holder.launchApk/' "$MAIN"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        run: |
+          echo "y" | sdkmanager "build-tools;35.0.0" "platforms;android-34" "platform-tools" 2>/dev/null
+          echo "$ANDROID_HOME/build-tools/35.0.0" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+
+      - name: Build BluecordPatcher
+        run: |
+          cd bluecord-patcher
+          gradle wrapper --gradle-version 8.2 --no-daemon
+          chmod +x gradlew
+          ./gradlew jar --no-daemon
+
+      - name: Generate signing keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore keystore.jks \
+            -alias bluecord \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Bluecord,OU=Dev,O=Bluecord,L=Unknown,ST=Unknown,C=US" \
+            -storepass bluecord123 -keypass bluecord123
+          echo "bluecord123" > keystore_password.txt
+
+      - name: Create config.ini
+        run: |
+          mkdir -p build_output/decompiled_discord
+          cat > config.ini << EOF
+          [config]
+          BaseDir=${{ github.workspace }}/build_output
+          BaseDecompiledApk=${{ github.workspace }}/build_output/decompiled_discord
+
+          [gradle]
+          ProjectHome=${{ github.workspace }}/bluecord
+          JavaHome=$JAVA_HOME
+
+          [sign]
+          SigningType = Password
+          KeyStoreFile=${{ github.workspace }}/keystore.jks
+          KeyStorePassword=${{ github.workspace }}/keystore_password.txt
+          EOF
+
+      - name: Build Bluecord APK
+        run: java -jar bluecord-patcher/build/libs/BluecordPatcher.jar config.ini
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bluecord-voice-fixed
+          path: build_output/compiled-aligned.apk
+          retention-days: 7
